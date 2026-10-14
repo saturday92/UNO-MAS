@@ -104,6 +104,8 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--gold);outline-o
 .turnpill{flex:1;text-align:center;font-family:var(--f-display);font-size:18px;letter-spacing:.5px;padding:10px;border-radius:20px;background:rgba(0,0,0,.3)}
 .turnpill.mine{background:var(--gold);color:var(--gold-ink)}
 .unobtn{width:64px;height:64px;border-radius:50%;background:var(--red);border:4px solid #fff;font-family:var(--f-display);font-size:19px;color:var(--yellow);box-shadow:0 4px 0 rgba(0,0,0,.4);flex:none}
+.unobtn.urgent{animation:pulse .6s ease-in-out infinite alternate}
+@keyframes pulse{to{transform:scale(1.12);box-shadow:0 0 0 6px var(--yellow),0 0 26px var(--yellow)}}
 .unobtn.on{background:var(--yellow);color:var(--red);box-shadow:0 0 0 4px var(--red),0 0 20px var(--yellow)}
 .actions{display:flex;gap:10px;justify-content:center;min-height:0}
 .actions:empty{display:none}
@@ -126,7 +128,7 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--gold);outline-o
 .wheel .hub{position:absolute;inset:50% auto auto 50%;transform:translate(-50%,-50%);width:86px;height:86px;border-radius:50%;background:var(--black);border:4px solid #fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:900;pointer-events:none}
 .trophy{font-size:80px;line-height:1}
 .toast{position:absolute;left:50%;bottom:24px;transform:translateX(-50%);background:#000;color:#fff;padding:10px 16px;border-radius:14px;font-weight:800;font-size:14px;z-index:30;max-width:90%;text-align:center}
-@media (prefers-reduced-motion:reduce){.card,.btn{transition:none}.spin{animation:none}}
+@media (prefers-reduced-motion:reduce){.unobtn.urgent{animation:none}.card,.btn{transition:none}.spin{animation:none}}
 .namefield{height:48px;border-radius:24px;border:2px solid var(--line);background:rgba(0,0,0,.25);color:var(--ink);font:inherit;font-weight:800;font-size:16px;text-align:center;width:100%}
 </style>
 </head>
@@ -206,6 +208,7 @@ function doDraw(s0,me){
   return s;
 }
 function doPass(s0,me){const s=clone(s0);s.rev++;s.drew=false;s.turn=1-me;s.log=P(me)+' passe';return s}
+function doUno(s0,me){const s=clone(s0);s.rev++;s.uno=-1;s.log=P(me)+' dit UNO !';return s}
 function doCatch(s0,me){const s=clone(s0);s.rev++;const o=1-me;drawN(s,o,2);s.uno=-1;s.log=P(o)+" n'a pas dit UNO : +2 !";return s}
 
 // ---------- État de la page ----------
@@ -264,7 +267,7 @@ function render(){
    </div>`;
   // Barre de tour
   h+=`<div class="bar"><div class="turnpill ${myTurn?'mine':''}">${S.winner>=0?'Partie terminée':myTurn?'À toi de jouer':'Tour de '+esc(NAME(S.turn))}</div>
-     <button class="unobtn ${saidUno?'on':''}" data-act="uno" aria-pressed="${saidUno}">UNO!</button></div>`;
+     <button class="unobtn ${saidUno||(hand(S,me).length===1&&S.uno!==me&&S.winner<0)?'on':''} ${S.uno===me?'urgent':''}" data-act="uno" aria-pressed="${saidUno}">UNO!</button></div>`;
   // Actions
   let acts='';
   if(myTurn&&S.pending>0)acts+=`<button class="btn ghost" data-act="draw">Piocher ${S.pending}</button>`;
@@ -381,7 +384,11 @@ async function act(a,el){
     case 'cancelpick':picking=-1;render();break;
     case 'draw':if(myTurn&&!S.drew)commit(doDraw(S,me));break;
     case 'pass':if(myTurn&&S.drew)commit(doPass(S,me));break;
-    case 'uno':saidUno=!saidUno;if(saidUno&&hand(S,me).length>2)toast('UNO se dit quand tu poses ton avant-dernière carte');render();break;
+    case 'uno':{if(!S||S.winner>=0)break;const n=hand(S,me).length;
+      if(S.uno===me){commit(doUno(S,me));break}
+      if(n===1){toast('UNO déjà validé');break}
+      if(n===2&&S.turn===me){saidUno=!saidUno;render();break}
+      toast(n===2?'Tu pourras dire UNO à ton tour, en posant ton avant-dernière carte':'UNO se dit quand il ne te reste plus qu\'une carte');break}
     case 'catch':if(S.uno===1-me)commit(doCatch(S,me));break;
     case 'again':{const ns=freshState(S.players);ns.names=S.names;ns.rev=S.rev+1;ns.turn=S.winner===0?1:0;ns.log=P(ns.turn)+' commence';if(mode==='local'){me=ns.turn;covered=true}commit(ns);break}
     case 'reveal':covered=false;render();break;
@@ -468,7 +475,7 @@ function onData(m){
   if(m.t==='state'&&m.s&&Array.isArray(m.s.discard)){
     if(!isHost&&!otherId)otherId=m.from;
     clearTimeout(joinTimer);
-    if(S&&m.s.rev<S.rev)return;
+    if(S&&(m.s.rev<S.rev||(m.s.rev===S.rev&&isHost)))return;  // égalité : la version de l'hôte gagne
     S=m.s;phase='';if(S.turn!==me){picking=-1;combo=null}render();
   }
 }
