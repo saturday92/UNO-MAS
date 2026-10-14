@@ -64,6 +64,7 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--gold);outline-o
 .note{color:var(--muted);font-size:13px;line-height:1.45;max-width:320px}
 .rules{text-align:left}.rules summary{cursor:pointer;font-weight:900;color:var(--ink);text-align:center}.rules ul{margin:8px 0 0;padding-left:18px;display:grid;gap:4px}
 .famrow{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;max-width:320px}.famrow .btn{min-width:130px}
+.quitbtn{font-size:12px;font-weight:900;color:var(--muted);background:rgba(0,0,0,.3);border-radius:12px;padding:5px 10px}
 .err{color:#ffb4b0;font-weight:800;font-size:14px;min-height:20px}
 .codebox{font-family:var(--f-display);font-size:56px;letter-spacing:12px;color:var(--gold);text-shadow:3px 3px 0 #000}
 
@@ -107,7 +108,7 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--gold);outline-o
 .hand.idle .card{filter:none;transform:none}
 
 /* Fenêtres */
-.modal{position:absolute;inset:0;background:rgba(0,0,0,.65);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;z-index:20;text-align:center;padding:24px}
+.modal{position:absolute;inset:0;background:rgba(0,0,0,.8);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;z-index:20;text-align:center;padding:24px}
 .modal h2{font-family:var(--f-display);font-size:30px;font-weight:400;text-shadow:3px 3px 0 #000;text-wrap:balance}
 .modal p{color:var(--muted);font-weight:800}
 .wheel{width:260px;height:260px;border-radius:50%;border:6px solid #fff;display:grid;grid-template-columns:1fr 1fr;overflow:hidden;position:relative;max-width:100%}
@@ -203,7 +204,7 @@ function doCatch(s0,me){const s=clone(s0);s.rev++;const o=1-me;drawN(s,o,2);s.un
 let mode=null;          // 'online' | 'local'
 let S=null, me=0, code=null, peer=null, conn=null, isHost=false, profiles={};
 let myName=(()=>{try{return localStorage.getItem('unomas.name')||''}catch(e){return ''}})();
-let saidUno=false, picking=-1, combo=null, covered=false, lobbyErr='', toastMsg='', toastT=null;
+let quitAsk=false, saidUno=false, picking=-1, combo=null, covered=false, lobbyErr='', toastMsg='', toastT=null;
 
 function NAME(i){
   if(mode==='local')return 'Joueur '+(i+1);
@@ -238,6 +239,7 @@ function render(){
   h+=`<div class="opp">${avatarHTML(opp,S.turn===opp&&S.winner<0)}<div class="who"><div class="name">${esc(NAME(opp))}</div>
      <div class="backs">${oh.slice(0,10).map(()=>backHTML('mini')).join('')}</div></div>
      <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">
+     <button class="quitbtn" data-act="askquit" aria-label="Quitter la partie">✕ Quitter</button>
      <span class="badge ${oh.length===1?'uno':''}">${oh.length===1?'UNO !':oh.length+' cartes'}</span>
      ${S.uno===opp&&S.winner<0?`<button class="btn red" style="height:34px;font-size:13px;padding:0 12px" data-act="catch">Pas dit UNO ! +2</button>`:''}
      </div></div>`;
@@ -276,7 +278,9 @@ function render(){
      :`<div class="modal"><h2>Famille de ${esc(val(c))} !</h2><p>Pose tes ${Object.keys(combo.by).length} cartes « ${esc(val(c))} » d'un coup. Touche la couleur qui reste dessus.</p>
       <div class="famrow">${Object.keys(combo.by).map(k=>`<button class="btn" data-act="fam" data-c="${k}" style="background:${CVAR[k]};color:${k==='y'?'var(--gold-ink)':'#fff'}">${CNAME[k]}</button>`).join('')}</div>
       <button class="btn ghost" data-act="one">Poser seulement ce ${esc(val(c))}</button><button class="btn ghost" data-act="cancelcombo">Annuler</button></div>`}
-  if(S.winner>=0)h+=`<div class="modal"><div class="trophy">${S.winner===me||mode==='local'?'🏆':'😵'}</div>
+  if(quitAsk)h+=`<div class="modal"><h2>Quitter la partie ?</h2><p>${mode==='online'?'Ton adversaire sera prévenu. Tu pourras ensuite créer ou rejoindre une autre partie.':'La partie en cours sera perdue.'}</p>
+     <button class="btn red" data-act="quit">Quitter la partie</button><button class="btn ghost" data-act="stay">Continuer à jouer</button></div>`;
+  else if(S.winner>=0)h+=`<div class="modal"><div class="trophy">${S.winner===me||mode==='local'?'🏆':'😵'}</div>
      <h2>${mode==='local'?esc(NAME(S.winner))+' gagne !':S.winner===me?'Victoire !':esc(NAME(S.winner))+' gagne'}</h2>
      <p>${mode==='local'?'':S.winner===me?'Tu as posé ta dernière carte.':'Il lui restait 0 carte, à toi '+mine.length+'.'}</p>
      <button class="btn gold" data-act="again">Rejouer</button><button class="btn ghost" data-act="leave">Accueil</button></div>`;
@@ -352,6 +356,9 @@ async function act(a,el){
     case 'catch':if(S.uno===1-me)commit(doCatch(S,me));break;
     case 'again':{const ns=freshState(S.players);ns.names=S.names;ns.rev=S.rev+1;ns.turn=S.winner===0?1:0;ns.log=P(ns.turn)+' commence';if(mode==='local'){me=ns.turn;covered=true}commit(ns);break}
     case 'reveal':covered=false;render();break;
+    case 'askquit':quitAsk=true;render();break;
+    case 'stay':quitAsk=false;render();break;
+    case 'quit':{quitAsk=false;const c=conn;conn=null;try{if(c&&c.open)c.send({t:'bye'})}catch(e){}try{history.replaceState(null,'',location.pathname+location.search)}catch(e){}lobbyErr='';setTimeout(leave,150);break}
     case 'leave':lobbyErr='';leave();break;
     case 'local':mode='local';me=0;covered=false;S=freshState(['A','B']);render();break;
     case 'create':saveName();createGame();break;
@@ -409,6 +416,7 @@ function wire(c){
 function onData(c,m){
   if(!m||typeof m!=='object')return;
   if(m.t==='full'){fail('Cette partie a déjà 2 joueurs.');return}
+  if(m.t==='bye'){conn=null;fail((S&&S.names&&S.names[1-me]||'Ton adversaire')+' a quitté la partie.');return}
   if(m.t==='hello'&&isHost){
     const nm=String(m.name||'').slice(0,16);
     if(!S){S=freshState(['h','g']);S.log='La partie commence !'}
