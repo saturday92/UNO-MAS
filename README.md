@@ -3,7 +3,7 @@
 Démo jouable d'un UNO vertical pour smartphone, à 2 joueurs.
 
 - `docs/index.html` : le jeu complet (une seule page, sans serveur à maintenir).
-- `docs/peerjs.min.js` : PeerJS 1.5.4, pour la connexion directe entre les deux téléphones.
+- Les coups transitent par le relais public gratuit [ntfy.sh](https://ntfy.sh) (HTTPS, sans compte), ce qui marche en Wi-Fi comme en 4G.
 
 ## Jouer
 

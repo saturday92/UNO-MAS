@@ -125,7 +125,6 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--gold);outline-o
 
 <div id="app"></div>
 
-<script src="peerjs.min.js"></script>
 <script>
 // ---------- Règles ----------
 const COLORS=['r','y','g','b'];
@@ -202,7 +201,7 @@ function doCatch(s0,me){const s=clone(s0);s.rev++;const o=1-me;drawN(s,o,2);s.un
 
 // ---------- État de la page ----------
 let mode=null;          // 'online' | 'local'
-let S=null, me=0, code=null, peer=null, conn=null, isHost=false, profiles={};
+let S=null, me=0, code=null, isHost=false, profiles={};
 let myName=(()=>{try{return localStorage.getItem('unomas.name')||''}catch(e){return ''}})();
 let quitAsk=false, saidUno=false, picking=-1, combo=null, covered=false, lobbyErr='', toastMsg='', toastT=null;
 
@@ -294,7 +293,7 @@ function lobbyHTML(){
     <p class="note">Donne ce code à ton adversaire, ou envoie-lui le lien. La partie démarre dès qu'il rejoint.</p>
     <div class="codebox">${esc(code)}</div>
     <button class="btn gold" data-act="copy">Copier le lien d'invitation</button>
-    <p class="note">${peer&&peer.open?'En attente du joueur 2…':'Connexion au serveur…'}</p>
+    <p class="note">${linkUp?'En attente du joueur 2…':'Connexion au serveur…'}</p>
     <button class="btn ghost" data-act="leave">Annuler</button></div>`;
   if(mode==='online')return `<div class="lobby">${logo}<p class="note">Connexion à la partie ${esc(code)}…</p><button class="btn ghost" data-act="leave">Annuler</button></div>`;
   const pre=(location.hash.slice(1).toUpperCase().match(/^[A-Z]{4}$/)||[''])[0];
@@ -327,7 +326,7 @@ async function commit(ns){
     render();return;
   }
   S=ns;saidUno=false;render();
-  if(conn&&conn.open)conn.send({t:'state',s:ns});else toast("L'adversaire n'est pas connecté : ton coup partira quand il reviendra.");
+  send({t:'state',s:ns});
 }
 document.addEventListener('click',e=>{
   const el=e.target.closest('[data-act]');if(!el)return;act(el.dataset.act,el);
@@ -358,7 +357,7 @@ async function act(a,el){
     case 'reveal':covered=false;render();break;
     case 'askquit':quitAsk=true;render();break;
     case 'stay':quitAsk=false;render();break;
-    case 'quit':{quitAsk=false;const c=conn;conn=null;try{if(c&&c.open)c.send({t:'bye'})}catch(e){}try{history.replaceState(null,'',location.pathname+location.search)}catch(e){}lobbyErr='';setTimeout(leave,150);break}
+    case 'quit':{quitAsk=false;send({t:'bye'});try{history.replaceState(null,'',location.pathname+location.search)}catch(e){}lobbyErr='';leave();break}
     case 'leave':lobbyErr='';leave();break;
     case 'local':mode='local';me=0;covered=false;S=freshState(['A','B']);render();break;
     case 'create':saveName();createGame();break;
@@ -367,8 +366,9 @@ async function act(a,el){
   }
 }
 function leave(){
-  try{if(conn)conn.close()}catch(e){}try{if(peer)peer.destroy()}catch(e){}
-  conn=null;peer=null;mode=null;S=null;code=null;isHost=false;picking=-1;combo=null;covered=false;render();
+  if(es){try{es.close()}catch(e){}es=null}
+  clearTimeout(joinTimer);linkUp=false;topic=null;otherId=null;
+  mode=null;S=null;code=null;isHost=false;picking=-1;combo=null;covered=false;quitAsk=false;render();
 }
 function saveName(){const v=(document.getElementById('name')?.value||'').trim().slice(0,16);myName=v;store.set('unomas.name',v)}
 function copyLink(){
@@ -376,53 +376,51 @@ function copyLink(){
   navigator.clipboard.writeText(url).then(()=>toast('Lien copié : envoie-le à ton adversaire'),()=>toast(url));
 }
 
-// ---------- En ligne : connexion directe entre les deux téléphones (PeerJS) ----------
-function peerOpts(){
-  const q=new URLSearchParams(location.search).get('srv');if(!q)return{debug:0};
-  const [host,port]=q.split(':');return{host,port:+port,path:'/',secure:false,debug:0};
-}
+// ---------- En ligne : relais de messages via ntfy.sh (HTTPS, aucun compte, marche sur tous les réseaux) ----------
+const RELAY=new URLSearchParams(location.search).get('relay')||'https://ntfy.sh';
+let es=null, topic=null, linkUp=false, otherId=null, joinTimer=null, sendChain=Promise.resolve();
+const myId=(()=>{let v=store.get('unomas.dev');if(!v){v=Math.random().toString(36).slice(2,12);store.set('unomas.dev',v)}return v})();
 function newCode(){const A='ABCDEFGHJKLMNPQRSTUVWXYZ';let c='';for(let i=0;i<4;i++)c+=A[Math.floor(Math.random()*A.length)];return c}
 function fail(msg){leave();lobbyErr=msg;render()}
+function send(m){
+  if(!topic)return;const t=topic;m.from=myId;
+  sendChain=sendChain.then(()=>fetch(RELAY+'/'+t,{method:'POST',body:JSON.stringify(m)}))
+    .then(r=>{if(r&&!r.ok)throw new Error(r.status)})
+    .catch(()=>{if(mode==='online')toast('Coup non envoyé : vérifie ta connexion.')});
+}
+function subscribe(onUp){
+  es=new EventSource(RELAY+'/'+topic+'/sse');
+  es.onopen=()=>{const first=!linkUp;linkUp=true;if(first)onUp();else send({t:'sync'});render()};
+  es.onmessage=e=>{let o;try{o=JSON.parse(e.data)}catch(_){return}
+    if(o.event&&o.event!=='message')return;let m;try{m=JSON.parse(o.message)}catch(_){return}
+    if(!m||m.from===myId)return;onData(m)};
+  es.onerror=()=>{if(es&&es.readyState===2&&mode==='online')toast('Connexion perdue, recharge la page.')};
+}
 function createGame(){
-  lobbyErr='';code=newCode();isHost=true;mode='online';me=0;S=null;
-  peer=new Peer('unomas-'+code,peerOpts());
-  peer.on('open',()=>render());
-  peer.on('connection',c=>{
-    if(conn&&conn.open){c.on('open',()=>{c.send({t:'full'});setTimeout(()=>c.close(),400)});return}
-    conn=c;wire(c);
-  });
-  peer.on('disconnected',()=>{if(peer&&!peer.destroyed)peer.reconnect()});
-  peer.on('error',e=>{
-    if(e.type==='unavailable-id'){try{peer.destroy()}catch(_){}createGame();return}
-    if(e.type==='peer-unavailable')return;
-    fail('Connexion impossible ('+e.type+'). Vérifie ton réseau et réessaie.');
-  });
-  render();
+  lobbyErr='';code=newCode();isHost=true;mode='online';me=0;S=null;otherId=null;
+  topic='unomas-v2-'+code;subscribe(()=>{});render();
 }
 function joinGame(c){
   lobbyErr='';if(!/^[A-Z]{4}$/.test(c||'')){lobbyErr='Le code fait 4 lettres.';render();return}
-  code=c;isHost=false;mode='online';me=1;S=null;
-  peer=new Peer(peerOpts());
-  peer.on('open',()=>{const k=peer.connect('unomas-'+c,{reliable:true});conn=k;wire(k);k.on('open',()=>k.send({t:'hello',name:myName}))});
-  peer.on('error',e=>fail(e.type==='peer-unavailable'?'Aucune partie avec le code '+c+'. Vérifie le code ou demande un nouveau lien.':'Connexion impossible ('+e.type+'). Vérifie ton réseau et réessaie.'));
+  code=c;isHost=false;mode='online';me=1;S=null;otherId=null;topic='unomas-v2-'+c;
+  subscribe(()=>{send({t:'hello',name:myName});
+    joinTimer=setTimeout(()=>{if(!S)fail('Aucune partie ne répond au code '+c+'. Vérifie que ton adversaire a bien créé la partie et garde la page ouverte.')},12000)});
   render();
 }
-function wire(c){
-  c.on('data',m=>onData(c,m));
-  c.on('close',()=>{if(conn!==c)return;conn=null;
-    if(isHost){toast("L'adversaire s'est déconnecté. Il peut revenir avec le même code.");render()}
-    else fail("La partie s'est arrêtée : le créateur de la partie a quitté.");});
-}
-function onData(c,m){
-  if(!m||typeof m!=='object')return;
-  if(m.t==='full'){fail('Cette partie a déjà 2 joueurs.');return}
-  if(m.t==='bye'){conn=null;fail((S&&S.names&&S.names[1-me]||'Ton adversaire')+' a quitté la partie.');return}
+function onData(m){
+  if(typeof m!=='object')return;
+  if(m.t==='full'){if(m.to===myId&&!S)fail('Cette partie a déjà 2 joueurs.');return}
+  if(otherId&&m.from!==otherId&&m.t!=='hello')return;
+  if(m.t==='bye'){fail((S&&S.names&&S.names[1-me]||'Ton adversaire')+' a quitté la partie.');return}
   if(m.t==='hello'&&isHost){
-    const nm=String(m.name||'').slice(0,16);
-    if(!S){S=freshState(['h','g']);S.log='La partie commence !'}
-    S.names=[myName,nm];S.rev++;c.send({t:'state',s:S});render();return;
+    if(otherId&&m.from!==otherId){send({t:'full',to:m.from});return}
+    otherId=m.from;const nm=String(m.name||'').slice(0,16);
+    if(!S)S=freshState(['h','g']);
+    S.names=[myName,nm];S.rev++;send({t:'state',s:S});render();return;
   }
+  if(m.t==='sync'){if(S)send({t:'state',s:S});return}
   if(m.t==='state'&&m.s&&Array.isArray(m.s.discard)){
+    if(!isHost&&!otherId){otherId=m.from;clearTimeout(joinTimer)}
     if(S&&m.s.rev<S.rev)return;
     S=m.s;if(S.turn!==me){picking=-1;combo=null}render();
   }
