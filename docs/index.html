@@ -226,8 +226,6 @@ function doAccuse(s0,me){
 function buzz(prev,next){
   try{
     if(!prev||!next||!navigator.vibrate||next.winner>=0)return;
-    const one=i=>hand(next,i).length===1&&hand(prev,i).length!==1;
-    if(one(0)||one(1)){navigator.vibrate([120,60,120,60,320]);return}
     if(mode==='online'&&next.turn===me&&prev.turn!==me)navigator.vibrate(220);
   }catch(e){}
 }
