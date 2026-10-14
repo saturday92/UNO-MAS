@@ -168,13 +168,19 @@ function drawN(s,i,n){
 function label(c){const v=val(c);return v==='S'?'Passe':v==='R'?'Inversion':v==='W'?'Joker':v==='+4'?'+4':v==='+2'?'+2':v}
 const P=i=>'{'+i+'}'; // nom du joueur, remplacé à l'affichage
 const isSpecial=c=>!/^\d$/.test(val(c));
-// Combos : plusieurs Inversions d'un coup, ou une famille (même chiffre, une carte par couleur, 2 à 4 cartes).
+// Combos : plusieurs Inversions d'un coup, ou une famille (toutes les cartes du même chiffre, couleurs identiques ou non).
+// Une famille se pose dès qu'une de ses cartes est jouable.
+function canTap(s,me,i){
+  const h=hand(s,me),c=h[i];
+  if(s.drew)return i===h.length-1&&canPlay(s,c);
+  if(canPlay(s,c))return true;
+  return s.pending===0&&/^\d$/.test(val(c))&&h.some((x,j)=>j!==i&&val(x)===val(c)&&canPlay(s,x));
+}
 function comboFor(s,me,i){
   if(s.pending>0||s.drew)return null;
   const h=hand(s,me),c=h[i],v=val(c);
   if(v==='R'){const idxs=h.map((x,j)=>j).filter(j=>val(h[j])==='R');return idxs.length>1?{kind:'R',idxs}:null}
-  if(/^\d$/.test(v)){const by={};h.forEach((x,j)=>{if(val(x)===v&&!(col(x) in by))by[col(x)]=j});
-    return Object.keys(by).length>1?{kind:'fam',by}:null}
+  if(/^\d$/.test(v)){const idxs=h.map((x,j)=>j).filter(j=>val(h[j])===v);return idxs.length>1?{kind:'fam',idxs}:null}
   return null;
 }
 function doPlay(s0,me,idxs,chosen,saidUno){
@@ -271,11 +277,12 @@ function render(){
   // Actions
   let acts='';
   if(myTurn&&S.pending>0)acts+=`<button class="btn ghost" data-act="draw">Piocher ${S.pending}</button>`;
+  if(myTurn&&!S.pending&&!S.drew)acts+=`<button class="btn ghost" data-act="draw">Piocher</button>`;
   if(myTurn&&S.drew)acts+=`<button class="btn ghost" data-act="pass">Passer</button>`;
   h+=`<div class="actions">${acts}</div>`;
   // Main
   h+=`<div class="handwrap"><div class="hand ${myTurn?'':'idle'}">${mine.map((c,i)=>{
-      const ok=myTurn&&canPlay(S,c)&&(!S.drew||i===mine.length-1);return cardHTML(c,myTurn?(ok?'ok':'no'):'',ok?`data-act="play" data-i="${i}" role="button" tabindex="0" aria-label="Jouer ${label(c)}"`:'');
+      const ok=myTurn&&canTap(S,me,i);return cardHTML(c,myTurn?(ok?'ok':'no'):'',ok?`data-act="play" data-i="${i}" role="button" tabindex="0" aria-label="Jouer ${label(c)}"`:'');
     }).join('')}</div></div></div>`;
   // Fenêtres
   if(picking>=0)h+=`<div class="modal"><h2>Choisis une couleur</h2><div class="wheel">
@@ -286,9 +293,9 @@ function render(){
     h+=combo.kind==='R'?`<div class="modal"><h2>Tu as ${combo.idxs.length} Inversions</h2><p>Tu peux toutes les poser d'un coup.</p>
       <button class="btn gold" data-act="allR">Poser les ${combo.idxs.length}</button><button class="btn ghost" data-act="one">Poser seulement celle-ci</button>
       <button class="btn ghost" data-act="cancelcombo">Annuler</button></div>`
-     :`<div class="modal"><h2>Famille de ${esc(val(c))} !</h2><p>Pose tes ${Object.keys(combo.by).length} cartes « ${esc(val(c))} » d'un coup. Touche la couleur qui reste dessus.</p>
-      <div class="famrow">${Object.keys(combo.by).map(k=>`<button class="btn" data-act="fam" data-c="${k}" style="background:${CVAR[k]};color:${k==='y'?'var(--gold-ink)':'#fff'}">${CNAME[k]}</button>`).join('')}</div>
-      <button class="btn ghost" data-act="one">Poser seulement ce ${esc(val(c))}</button><button class="btn ghost" data-act="cancelcombo">Annuler</button></div>`}
+     :`<div class="modal"><h2>Famille de ${esc(val(c))} !</h2><p>Pose tes ${combo.idxs.length} cartes « ${esc(val(c))} » d'un coup. Touche la couleur qui reste dessus.</p>
+      <div class="famrow">${[...new Set(combo.idxs.map(j=>col(mine[j])))].map(k=>`<button class="btn" data-act="fam" data-c="${k}" style="background:${CVAR[k]};color:${k==='y'?'var(--gold-ink)':'#fff'}">${CNAME[k]}</button>`).join('')}</div>
+      ${canPlay(S,c)?`<button class="btn ghost" data-act="one">Poser seulement ce ${esc(val(c))}</button>`:''}<button class="btn ghost" data-act="cancelcombo">Annuler</button></div>`}
   if(quitAsk)h+=`<div class="modal"><h2>Quitter la partie ?</h2><p>${mode==='online'?'Ton adversaire sera prévenu. Tu pourras ensuite créer ou rejoindre une autre partie.':'La partie en cours sera perdue.'}</p>
      <button class="btn red" data-act="quit">Quitter la partie</button><button class="btn ghost" data-act="stay">Continuer à jouer</button></div>`;
   else if(S.winner>=0)h+=`<div class="modal"><div class="trophy">${S.winner===me||mode==='local'?'🏆':'😵'}</div>
@@ -343,7 +350,8 @@ function lobbyHTML(){
     <li>Si la carte piochée est jouable, tu peux la poser tout de suite.</li>
     <li>Interdit de finir sur une carte spéciale : tu la poses, mais tu pioches 1.</li>
     <li>Plusieurs Inversions se posent d'un coup.</li>
-    <li>Un même chiffre dans 2, 3 ou 4 couleurs se pose d'un coup.</li>
+    <li>Plusieurs cartes du même chiffre se posent d'un coup, quelles que soient leurs couleurs, dès que l'une d'elles est jouable.</li>
+    <li>Tu peux toujours piocher, même si tu as une carte jouable.</li>
     <li>À 2 joueurs, Passe et Inversion te font rejouer.</li></ul></details>
    <p class="note">En ligne : chacun ouvre cette page sur son téléphone. L'un crée la partie, l'autre tape le code. Pas besoin de compte.</p></div>`;
 }
@@ -372,13 +380,13 @@ async function act(a,el){
   const myTurn=S&&S.turn===me&&S.winner<0;
   switch(a){
     case 'play':{if(!myTurn)return;const i=+el.dataset.i;const c=hand(S,me)[i];
-      if(S.drew&&i!==hand(S,me).length-1)return;
+      if(!canTap(S,me,i))return;
       if(col(c)==='k'){picking=i;render();return}
       const cb=comboFor(S,me,i);if(cb){combo={...cb,i};render();return}
       commit(doPlay(S,me,i,null,saidUno));break}
     case 'one':{const i=combo.i;combo=null;commit(doPlay(S,me,i,null,saidUno));break}
     case 'allR':{const idxs=combo.idxs.filter(j=>j!==combo.i).concat(combo.i);combo=null;commit(doPlay(S,me,idxs,null,saidUno));break}
-    case 'fam':{const t=el.dataset.c,by=combo.by;const idxs=Object.keys(by).filter(k=>k!==t).map(k=>by[k]).concat(by[t]);combo=null;commit(doPlay(S,me,idxs,null,saidUno));break}
+    case 'fam':{const t=el.dataset.c,h=hand(S,me);const top=combo.idxs.find(j=>col(h[j])===t);const idxs=combo.idxs.filter(j=>j!==top).concat(top);combo=null;commit(doPlay(S,me,idxs,null,saidUno));break}
     case 'cancelcombo':combo=null;render();break;
     case 'color':{const i=picking;picking=-1;commit(doPlay(S,me,i,el.dataset.c,saidUno));break}
     case 'cancelpick':picking=-1;render();break;

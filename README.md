@@ -22,5 +22,6 @@ Le mode « Jouer à 2 sur ce téléphone » marche sans réseau.
 - Carte piochée jouable : on peut la poser tout de suite, sinon le tour passe.
 - Interdit de finir sur une carte spéciale : on la pose, mais on pioche 1.
 - Plusieurs Inversions se posent d'un coup.
-- Un même chiffre dans 2, 3 ou 4 couleurs différentes se pose d'un coup.
+- Plusieurs cartes du même chiffre (couleurs identiques ou non) se posent d'un coup dès que l'une est jouable.
+- On peut toujours piocher, même avec une carte jouable.
 - À 2 joueurs, Passe et Inversion font rejouer.
