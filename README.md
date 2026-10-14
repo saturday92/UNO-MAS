@@ -24,4 +24,6 @@ Le mode « Jouer à 2 sur ce téléphone » marche sans réseau.
 - Plusieurs Inversions se posent d'un coup.
 - Plusieurs cartes du même chiffre (couleurs identiques ou non) se posent d'un coup dès que l'une est jouable.
 - On peut toujours piocher, même avec une carte jouable.
+- Si quelqu'un pioche alors qu'il avait une carte jouable, l'adversaire peut l'accuser tant qu'il n'a pas rejoué : +2 pour lui. Fausse accusation : l'accusateur pioche 2.
+- Le téléphone vibre quand c'est ton tour (en ligne) et chez les deux joueurs quand quelqu'un tombe à une carte (Android ; l'iPhone ne gère pas la vibration).
 - À 2 joueurs, Passe et Inversion font rejouer.

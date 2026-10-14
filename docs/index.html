@@ -189,6 +189,7 @@ function doPlay(s0,me,idxs,chosen,saidUno){
   [...idxs].sort((a,b)=>b-a).forEach(i=>h.splice(i,1));
   s.discard.push(...cards);const card=cards[cards.length-1];
   s.color=col(card)==='k'?chosen:col(card);s.drew=false;s.uno=-1;s.rev++;
+  if(s.dc&&s.dc.p===me)s.dc=null;  // il a rejoué avant d'être accusé : on continue
   const v=val(card),other=1-me,who=P(me);
   if(!h.length&&!isSpecial(card)){s.winner=me;s.pending=0;s.log=who+(cards.length>1?' pose '+cards.length+' cartes et gagne !':' a posé sa dernière carte !');return s}
   let lastSpecial=false;
@@ -208,13 +209,28 @@ function doPlay(s0,me,idxs,chosen,saidUno){
 function doDraw(s0,me){
   const s=clone(s0);s.rev++;s.uno=-1;
   if(s.pending>0){const n=drawN(s,me,s.pending);s.log=P(me)+' pioche '+n+' cartes';s.pending=0;s.turn=1-me;s.drew=false}
-  else{const n=drawN(s,me,1);const h=hand(s,me);
+  else{s.dc={p:me,had:hand(s0,me).some(c=>canPlay(s0,c))};  // pioche volontaire : l'adversaire peut l'accuser
+    const n=drawN(s,me,1);const h=hand(s,me);
     if(n&&canPlay(s,h[h.length-1])){s.drew=true;s.log=P(me)+' pioche une carte jouable'}
     else{s.drew=false;s.turn=1-me;s.log=P(me)+' pioche et passe'}}
   return s;
 }
 function doPass(s0,me){const s=clone(s0);s.rev++;s.drew=false;s.turn=1-me;s.log=P(me)+' passe';return s}
 function doUno(s0,me){const s=clone(s0);s.rev++;s.uno=-1;s.log=P(me)+' dit UNO !';return s}
+function doAccuse(s0,me){
+  const s=clone(s0);s.rev++;const o=1-me;
+  if(s.dc&&s.dc.had){const h=hand(s,o),keep=s.drew&&s.turn===o?h.pop():null;drawN(s,o,2);if(keep)h.push(keep);s.log=P(me)+' accuse '+P(o)+' : il avait une carte jouable, +2 !'}
+  else{drawN(s,me,2);s.log='Fausse accusation : '+P(o)+" n'avait rien à jouer, "+P(me)+' pioche 2'}
+  s.dc=null;return s;
+}
+function buzz(prev,next){
+  try{
+    if(!prev||!next||!navigator.vibrate||next.winner>=0)return;
+    const one=i=>hand(next,i).length===1&&hand(prev,i).length!==1;
+    if(one(0)||one(1)){navigator.vibrate([120,60,120,60,320]);return}
+    if(mode==='online'&&next.turn===me&&prev.turn!==me)navigator.vibrate(220);
+  }catch(e){}
+}
 function doCatch(s0,me){const s=clone(s0);s.rev++;const o=1-me;drawN(s,o,2);s.uno=-1;s.log=P(o)+" n'a pas dit UNO : +2 !";return s}
 
 // ---------- État de la page ----------
@@ -259,6 +275,7 @@ function render(){
      <button class="quitbtn" data-act="askquit" aria-label="Quitter la partie">✕ Quitter</button>
      <span class="badge ${oh.length===1?'uno':''}">${oh.length===1?'UNO !':oh.length+' cartes'}</span>
      ${S.uno===opp&&S.winner<0?`<button class="btn red" style="height:34px;font-size:13px;padding:0 12px" data-act="catch">Pas dit UNO ! +2</button>`:''}
+     ${S.dc&&S.dc.p===opp&&S.winner<0?`<button class="btn red" style="height:34px;font-size:13px;padding:0 12px" data-act="accuse">Il avait une carte ! +2</button>`:''}
      </div></div>`;
   // Table
   const canDraw=myTurn&&!S.drew;
@@ -351,7 +368,7 @@ function lobbyHTML(){
     <li>Interdit de finir sur une carte spéciale : tu la poses, mais tu pioches 1.</li>
     <li>Plusieurs Inversions se posent d'un coup.</li>
     <li>Plusieurs cartes du même chiffre se posent d'un coup, quelles que soient leurs couleurs, dès que l'une d'elles est jouable.</li>
-    <li>Tu peux toujours piocher, même si tu as une carte jouable.</li>
+    <li>Tu peux toujours piocher, même si tu as une carte jouable. Mais l'adversaire peut t'accuser (« Il avait une carte ! ») tant que tu n'as pas rejoué : s'il a raison tu pioches 2, s'il se trompe c'est lui qui pioche 2.</li>
     <li>À 2 joueurs, Passe et Inversion te font rejouer.</li></ul></details>
    <p class="note">En ligne : chacun ouvre cette page sur son téléphone. L'un crée la partie, l'autre tape le code. Pas besoin de compte.</p></div>`;
 }
@@ -361,6 +378,7 @@ function finish(){
 
 // ---------- Actions ----------
 async function commit(ns){
+  buzz(S,ns);
   if(mode==='local'){
     S=ns;saidUno=false;
     if(ns.winner<0&&ns.turn!==me){me=ns.turn;covered=true}
@@ -398,6 +416,7 @@ async function act(a,el){
       if(n===2&&S.turn===me){saidUno=!saidUno;render();break}
       toast(n===2?'Tu pourras dire UNO à ton tour, en posant ton avant-dernière carte':'UNO se dit quand il ne te reste plus qu\'une carte');break}
     case 'catch':if(S.uno===1-me)commit(doCatch(S,me));break;
+    case 'accuse':if(S.dc&&S.dc.p===1-me)commit(doAccuse(S,me));break;
     case 'again':{const ns=freshState(S.players);ns.names=S.names;ns.rev=S.rev+1;ns.turn=S.winner===0?1:0;ns.log=P(ns.turn)+' commence';if(mode==='local'){me=ns.turn;covered=true}commit(ns);break}
     case 'reveal':covered=false;render();break;
     case 'askquit':quitAsk=true;render();break;
@@ -484,7 +503,7 @@ function onData(m){
     if(!isHost&&!otherId)otherId=m.from;
     clearTimeout(joinTimer);
     if(S&&(m.s.rev<S.rev||(m.s.rev===S.rev&&isHost)))return;  // égalité : la version de l'hôte gagne
-    S=m.s;phase='';if(S.turn!==me){picking=-1;combo=null}render();
+    buzz(S,m.s);S=m.s;phase='';if(S.turn!==me){picking=-1;combo=null}render();
   }
 }
 
