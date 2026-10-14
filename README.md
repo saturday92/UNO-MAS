@@ -8,7 +8,7 @@ Démo jouable d'un UNO vertical pour smartphone, à 2 joueurs.
 ## Jouer
 
 Une fois GitHub Pages activé (Settings → Pages → branche `main`, dossier `/docs`), le jeu est à l'adresse
-`https://saturday92.github.io/uno-mas/`. Aucun compte n'est nécessaire :
+`https://saturday92.github.io/UNO-MAS/`. Aucun compte n'est nécessaire :
 
 1. Le joueur 1 ouvre la page et appuie sur « Créer une partie en ligne ».
 2. Il envoie le lien d'invitation (ou le code de 4 lettres) au joueur 2.
