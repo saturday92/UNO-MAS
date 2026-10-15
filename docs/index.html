@@ -336,7 +336,7 @@ function render(){
   h+=`<div class="actions">${acts}</div>`;
   // Main
   h+=`<div class="handwrap"><div class="hand ${myTurn?'':'idle'}">${mine.map((c,i)=>{
-      const ok=myTurn&&canTap(S,me,i);return cardHTML(c,myTurn?(ok?'ok':'no'):'',ok?`data-act="play" data-i="${i}" role="button" tabindex="0" aria-label="Jouer ${label(c)}"`:'');
+      const ok=myTurn&&canTap(S,me,i)&&canPlay(S,c);return cardHTML(c,myTurn?(ok?'ok':'no'):'',ok?`data-act="play" data-i="${i}" role="button" tabindex="0" aria-label="Jouer ${label(c)}"`:'');
     }).join('')}</div></div></div>`;
   // Fenêtres
   if(picking>=0)h+=`<div class="modal"><h2>Choisis une couleur</h2><div class="wheel">
@@ -405,7 +405,7 @@ function lobbyHTML(){
     <li>Si la carte piochée est jouable, tu peux la poser tout de suite.</li>
     <li>Interdit de finir sur une carte spéciale : tu la poses, mais tu pioches 1.</li>
     <li>Plusieurs Inversions se posent d'un coup.</li>
-    <li>Plusieurs cartes du même chiffre se posent d'un coup, quelles que soient leurs couleurs, dès que l'une d'elles est jouable.</li>
+    <li>Plusieurs cartes du même chiffre se posent d'un coup, quelles que soient leurs couleurs, dès que l'une d'elles est jouable : touche celle qui est allumée et le jeu te propose toute la famille.</li>
     <li>Tu peux toujours piocher, même si tu as une carte jouable. Mais les autres peuvent t'accuser (« Il avait une carte ! ») tant que tu n'as pas rejoué : si l'accusateur a raison tu pioches 2, sinon c'est lui qui pioche 2.</li>
     <li>À 2 joueurs, Passe et Inversion te font rejouer. À 3 ou plus, Passe fait sauter le suivant et Inversion change le sens.</li></ul></details>
    <p class="note">En ligne : chacun ouvre cette page sur son téléphone. L'un crée la partie, les autres (jusqu'à 5) tapent le code. Pas besoin de compte.</p></div>`;
