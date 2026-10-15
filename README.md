@@ -26,5 +26,5 @@ Le mode « Sur ce téléphone » (2 à 6 joueurs) marche sans réseau.
 - Plusieurs cartes du même chiffre (couleurs identiques ou non) se posent d'un coup dès que l'une est jouable.
 - On peut toujours piocher, même avec une carte jouable.
 - Si quelqu'un pioche alors qu'il avait une carte jouable, n'importe quel autre joueur peut l'accuser tant qu'il n'a pas rejoué : +2 pour lui. Fausse accusation : l'accusateur pioche 2.
-- Le téléphone vibre quand c'est ton tour (en ligne). Aucune vibration quand quelqu'un tombe à une carte, il faut le repérer soi-même (Android ; l'iPhone ne gère pas la vibration).
+- À ton tour (en ligne) : le téléphone vibre (Android), donne un petit retour haptique (iPhone récent) et joue un petit son, qu'on coupe avec 🔔. Aucune vibration quand quelqu'un tombe à une carte.
 - À 2 joueurs, Passe et Inversion font rejouer. À 3 ou plus, Passe fait sauter le suivant et Inversion change le sens.
