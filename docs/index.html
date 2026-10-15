@@ -176,7 +176,7 @@ const NP=s=>s.players.length;
 // Joueur suivant dans le sens du jeu (k=2 : on saute le suivant)
 const nextP=(s,i,k=1)=>{const n=NP(s);return((i+(s.dir||1)*k)%n+n)%n};
 function canPlay(s,card){
-  if(s.pending>0){return val(card)==='+4'||(val(card)==='+2'&&val(topCard(s))==='+2')}
+  if(s.pending>0){return val(card)===val(topCard(s))}  // +2 sur +2, +4 sur +4, pas de mélange
   return col(card)==='k'||col(card)===s.color||val(card)===val(topCard(s));
 }
 function drawN(s,i,n){
@@ -323,7 +323,7 @@ function render(){
    </div>
    <div class="colorchip"><span class="dot" style="background:${CVAR[S.color]}"></span>Couleur : ${CNAME[S.color]} · pioche ${S.deck.length}</div>
    <div class="log">${esc(S.log.replace(/\{(\d)\}/g,(m,d)=>NAME(+d)))}</div>
-   ${S.pending>0&&S.winner<0?`<div class="attack"><span>${S.turn===me?'Attaque : +'+S.pending+' pour toi ! Contre avec un '+(val(topCard(S))==='+2'?'+2 ou +4':'+4')+', ou pioche.':esc(NAME(S.turn))+' doit contrer ou piocher '+S.pending}</span></div>`:''}
+   ${S.pending>0&&S.winner<0?`<div class="attack"><span>${S.turn===me?'Attaque : +'+S.pending+' pour toi ! Contre avec un '+val(topCard(S))+', ou pioche.':esc(NAME(S.turn))+' doit contrer ou piocher '+S.pending}</span></div>`:''}
    </div>`;
   // Barre de tour
   h+=`<div class="bar"><div class="turnpill ${myTurn?'mine':''}">${S.winner>=0?'Partie terminée':myTurn?'À toi de jouer':'Tour de '+esc(NAME(S.turn))}</div>
@@ -401,7 +401,7 @@ function lobbyHTML(){
     <div class="localrow"><span>Sur ce téléphone :</span>${[2,3,4,5,6].map(n=>`<button class="btn ghost" data-act="local" data-n="${n}" aria-label="Jouer à ${n} sur ce téléphone">${n}</button>`).join('')}</div>
    </div><div class="err">${esc(lobbyErr)}</div>
    <details class="note rules"><summary>Règles UNO MÁS</summary><ul>
-    <li>Sur un +2, contre avec un +2 ou un +4. Sur un +4, contre avec un +4. Celui qui ne peut plus contrer pioche tout.</li>
+    <li>Sur un +2, contre avec un +2. Sur un +4, contre avec un +4. On ne mélange pas les deux. Celui qui ne peut plus contrer pioche tout.</li>
     <li>Si la carte piochée est jouable, tu peux la poser tout de suite.</li>
     <li>Interdit de finir sur une carte spéciale : tu la poses, mais tu pioches 1.</li>
     <li>Plusieurs Inversions se posent d'un coup.</li>

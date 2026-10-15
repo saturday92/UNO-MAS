@@ -19,7 +19,7 @@ Le mode « Sur ce téléphone » (2 à 6 joueurs) marche sans réseau.
 
 ## Règles maison
 
-- Sur un +2 : contre avec un +2 ou un +4. Sur un +4 : contre avec un +4. Celui qui ne peut plus contrer pioche tout.
+- Sur un +2 : contre avec un +2. Sur un +4 : contre avec un +4. Pas de +4 sur un +2 ni de +2 sur un +4. Celui qui ne peut plus contrer pioche tout.
 - Carte piochée jouable : on peut la poser tout de suite, sinon le tour passe.
 - Interdit de finir sur une carte spéciale : on la pose, mais on pioche 1.
 - Plusieurs Inversions se posent d'un coup.
